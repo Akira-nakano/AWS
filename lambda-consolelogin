@@ -1,0 +1,62 @@
+#特定のユーザーグループがサインインした時のみSNS通知し、メトリクスにカウントさせる
+
+import base64
+import gzip
+import json
+import boto3
+
+def lambda_handler(event, context):
+    # CloudWatch Logsからログデータを取得
+    logs = event['awslogs']['data']
+
+    # ログデータをデコードして展開
+    decoded_logs = base64.b64decode(logs)
+    uncompressed_logs = gzip.decompress(decoded_logs)
+    log_events = json.loads(uncompressed_logs)
+
+    # 各ログイベントに対して処理を行う
+    for log_event in log_events['logEvents']:
+        log_message = log_event['message']
+        log_data = json.loads(log_message)
+
+        # ログイベントがAwsConsoleSignInであるか確認
+        if log_data['eventType'] == 'AwsConsoleSignIn':
+            user_name = log_data['userIdentity']['userName']
+
+            # IAMクライアントを作成
+            iam = boto3.client('iam')
+
+            # ユーザーグループの一覧を取得
+            response = iam.list_groups_for_user(UserName=user_name)
+            groups = response['Groups']
+
+            # ユーザーグループがAdministratorであるかどうかをチェック
+            is_administrator = any(group['GroupName'] == 'cloud9' for group in groups)
+
+            # SNS通知とメトリクスのカウントを行う
+            if is_administrator:
+                sns = boto3.client('sns')
+                sns.publish(
+                    TopicArn='arn:aws:sns:ap-northeast-1:985386601100:topic',
+                    Subject='IAM Administrator User Access Alert',
+                    Message='The IAM user ' + user_name + ' has accessed an AWS service with Administrator permissions.'
+                )
+
+                # AWS/Lambda/ConsoleLogin/Countメトリクスのカウントを行う
+                cloudwatch = boto3.client('cloudwatch')
+                cloudwatch.put_metric_data(
+                    Namespace='AWS/Lambda',
+                    MetricData=[
+                        {
+                            'MetricName': 'ConsoleLogin',
+                            'Dimensions': [
+                                {
+                                    'Name': 'FunctionName',
+                                    'Value': context.function_name
+                                }
+                            ],
+                            'Value': 1 if is_administrator else 0,
+                            'Unit': 'Count'
+                        }
+                    ]
+                )
