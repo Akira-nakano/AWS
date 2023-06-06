@@ -1,0 +1,21 @@
+SELECT
+  year,
+  month,
+  source_address,
+  destination_address,
+  source_port,
+  destination_port,
+  SUM(CASE WHEN action = 'DroppedPackets' THEN 1 ELSE 0 END) AS dropped_packets,
+  SUM(CASE WHEN action = 'RejectedPackets' THEN 1 ELSE 0 END) AS rejected_packets
+FROM
+  nfw_logs
+WHERE
+  year = '2023'
+  AND month = '06'
+GROUP BY
+  year,
+  month,
+  source_address,
+  destination_address,
+  source_port,
+  destination_port;
