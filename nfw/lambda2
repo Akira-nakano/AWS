@@ -1,0 +1,60 @@
+import boto3
+from datetime import datetime, timedelta
+
+def lambda_handler(event, context):
+    # Athenaクライアントを作成
+    athena_client = boto3.client('athena')
+    
+    # 前月の年と月を計算
+    current_date = datetime.now()
+    previous_month = current_date.replace(day=1) - timedelta(days=1)
+    year = previous_month.strftime('%Y')
+    month = previous_month.strftime('%m')
+    
+    # クエリの実行パラメータを設定
+    query = f"""
+        SELECT
+          year,
+          month,
+          source_address,
+          destination_address,
+          source_port,
+          destination_port,
+          SUM(CASE WHEN action = 'DroppedPackets' THEN 1 ELSE 0 END) AS dropped_packets,
+          SUM(CASE WHEN action = 'RejectedPackets' THEN 1 ELSE 0 END) AS rejected_packets
+        FROM
+          nfw_logs
+        WHERE
+          year = '{year}'
+          AND month = '{month}'
+        GROUP BY
+          year,
+          month,
+          source_address,
+          destination_address,
+          source_port,
+          destination_port;
+    """
+    database = 'default'  # 使用するデータベース名
+    output_bucket = 's3-operation'  # 結果を保存するS3バケット名
+    output_key = f'result_{year}_{month}.csv'  # 結果のCSVファイル名
+    
+    # Athenaクエリの実行
+    response = athena_client.start_query_execution(
+        QueryString=query,
+        QueryExecutionContext={
+            'Database': database
+        },
+        ResultConfiguration={
+            'OutputLocation': f's3://{output_bucket}/'
+        }
+    )
+    
+    # クエリの実行結果をCSVファイルとしてダウンロード
+    query_execution_id = response['QueryExecutionId']
+    output_file = f'{output_bucket}/{output_key}'
+    s3_client = boto3.client('s3')
+    s3_client.download_file(output_bucket, query_execution_id + '.csv', '/tmp/result.csv')
+    
+    # CSVファイルを指定のS3バケットにアップロード
+    s3_client.upload_file('/tmp/result.csv', output_bucket, output_key)
