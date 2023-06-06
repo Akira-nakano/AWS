@@ -1,0 +1,31 @@
+#これはEventBridgeスケジュールのロールは含まれていない。スケジュールと紐づけた時にロールが追加されるか要確認
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AthenaAccess",
+            "Effect": "Allow",
+            "Action": [
+                "athena:StartQueryExecution",
+                "athena:GetQueryExecution",
+                "athena:GetQueryResults",
+                "athena:StopQueryExecution"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Sid": "S3Access",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::s3-operation",
+                "arn:aws:s3:::s3-operation/*"
+            ]
+        }
+    ]
+}
