@@ -1,0 +1,24 @@
+CREATE EXTERNAL TABLE IF NOT EXISTS nfw_logs (
+  version INT,
+  account_id STRING,
+  interface_id STRING,
+  source_address STRING,
+  destination_address STRING,
+  source_port INT,
+  destination_port INT,
+  protocol STRING,
+  firewall_domain STRING,
+  rule_group_name STRING,
+  action STRING,
+  alert_log_status STRING,
+  log_timestamp STRING,
+  log_status_reason STRING,
+  packet_trace STRING,
+  domain_validation_result STRING
+)
+PARTITIONED BY (year STRING, month STRING, day STRING)
+ROW FORMAT SERDE 'org.openx.data.jsonserde.JsonSerDe'
+WITH SERDEPROPERTIES (
+  'serialization.format' = '1'
+)
+LOCATION 's3://s3-nfw-log/';
